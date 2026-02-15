@@ -92,6 +92,7 @@
             // スプレッドシート上はカンマ区切りでタグが保存されているため合わせて整形
             this.items = data.map((item) => ({
               ...item,
+              expiry: this.formatDateOnly(item.expiry),
               tags:
                 typeof item.tags === "string"
                   ? item.tags.split(",").filter(Boolean)
@@ -123,6 +124,13 @@
 
           filtered() {
             return this.items.filter((i) => !this.hideIgnored || !i.ignore);
+          },
+
+          // YYYY/MM/DD形式に変換する
+          formatDateOnly(iso) {
+            return new Date(iso).toLocaleDateString("ja-JP", {
+              timeZone: "Asia/Tokyo",
+            });
           },
         };
       }
