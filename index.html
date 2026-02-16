@@ -14,7 +14,11 @@
     <link rel="stylesheet" href="style.css" />
   </head>
 
-  <body x-data="app()" x-init="load()">
+  <body
+    x-data="app()"
+    x-init="loadData()"
+    @submit-data.window="saveItem($event.detail)"
+  >
     <header>賞味期限管理</header>
 
     <main>
@@ -27,48 +31,55 @@
       </div>
       <!-- 入力フォーム -->
       <div class="card">
-        <h3>追加</h3>
+        <div x-data="foodForm()">
+          <!-- 商品名 -->
+          <label>商品名</label>
+          <input type="text" placeholder="食品名" x-model="name" required />
 
-        <input type="text" placeholder="食品名" x-model="form.name" />
-        <input type="date" x-model="form.expiry" />
-        <input
-          type="text"
-          placeholder="タグ（例：納豆 冷凍）"
-          x-model="form.tags"
-        />
+          <!-- カテゴリ選択 -->
+          <label>カテゴリ</label>
+          <select x-model="category" @change="applyGrace()">
+            <option value="">選択してください</option>
+            <template x-for="(days, name) in categories" :key="name">
+              <option :value="name" x-text="name"></option>
+            </template>
+          </select>
 
-        <label>
-          <input type="checkbox" x-model="form.ignore" />
-          期限切れでも許容
-        </label>
+          <!-- 賞味・消費期限 -->
+          <label>期限</label>
+          <input type="date" x-model="expireDate" required />
 
-        <button @click="add()">追加</button>
+          <!-- 猶予日数 -->
+          <label>猶予日数（必要な場合のみ変更）</label>
+          <input type="number" x-model.number="graceDays" />
+
+          <!-- デバッグ表示 -->
+          <pre x-text="JSON.stringify({category, graceDays}, null, 2)"></pre>
+          <button @click="submit()">追加</button>
+        </div>
       </div>
 
       <!-- フィルター -->
       <div class="card">
-        <label>
-          <input type="checkbox" x-model="hideIgnored" />
-          許容品を非表示
-        </label>
+        <label> このあたりにフィルタボタンを配置 </label>
       </div>
 
       <!-- 一覧 -->
       <div class="list">
-        <template x-for="item in filtered()" :key="item.id">
+        <template x-for="item in items" :key="item.id">
           <div class="item" :class="{ expired: isExpired(item) }">
             <strong x-text="item.name"></strong>
-            <div>期限：<span x-text="item.expiry"></span></div>
+            <div>期限：<span x-text="item.expireDate"></span></div>
 
-            <div>
-              <template x-for="tag in item.tags">
+            <!-- <div>
+              <template x-for="tag in item.category">
                 <span class="tag" x-text="tag"></span>
               </template>
-            </div>
+            </div> -->
 
-            <div x-show="item.ignore" style="color: #ef4444; font-size: 12px">
+            <!-- <div x-show="item.ignore" style="color: #ef4444; font-size: 12px">
               ※期限切れ許容
-            </div>
+            </div> -->
           </div>
         </template>
       </div>
@@ -76,64 +87,71 @@
 
     <script>
       const API =
-        "https://script.google.com/macros/s/AKfycbw8qNC_5N97lnovPQOG2GeoRRG4a4t6Rwl2INOb8Lu12IHq6g6d2nCIlCqI02aWfLeeLg/exec";
-      const KEY = "x8KpT2F7mH6z9NqJ5Cw4YB3Z0sE1LrOaDVXcIikUuStQyRdbGMnhPeWfAj";
+        'https://script.google.com/macros/s/AKfycbw8qNC_5N97lnovPQOG2GeoRRG4a4t6Rwl2INOb8Lu12IHq6g6d2nCIlCqI02aWfLeeLg/exec';
+      const KEY = 'x8KpT2F7mH6z9NqJ5Cw4YB3Z0sE1LrOaDVXcIikUuStQyRdbGMnhPeWfAj';
+
+      const GRACE_BY_CATEGORY = {
+        肉・魚: 0,
+        惣菜: 0,
+        乳製品: 2,
+        卵: 7,
+        野菜・果物: 3,
+        調味料: 180,
+        缶詰: 365,
+        乾物: 365,
+        レトルト: 180,
+        お菓子: 30,
+        飲料: 7,
+        その他: 0,
+      };
 
       function app() {
         return {
-          hideIgnored: false,
-
-          form: {
-            name: "",
-            expiry: "",
-            tags: "",
-            ignore: false,
-          },
-
           items: [],
 
           loading: false,
 
-          async load() {
+          async loadData() {
             this.loading = true;
             try {
-              const res = await fetch(`${API}?key=${KEY}`);
-              const data = await res.json();
+              const data = await fetch(`${API}?key=${KEY}`).then((r) =>
+                r.json(),
+              );
 
               // スプレッドシート上はカンマ区切りでタグが保存されているため合わせて整形
               this.items = data.map((item) => ({
                 ...item,
-                expiry: this.formatDateOnly(item.expiry),
-                tags:
-                  typeof item.tags === "string"
-                    ? item.tags.split(",").filter(Boolean)
-                    : item.tags,
+                expireDate: this.formatDateOnly(item.expiry),
+                category: item.category,
+                // typeof item.category === 'string'
+                //   ? item.category.split(',').filter(Boolean)
+                //   : item.category,
               }));
             } catch (e) {
-              alert("通信に失敗しました。もう一度操作をやり直してください。");
+              alert('通信に失敗しました。もう一度操作をやり直してください。');
               console.error(e);
             } finally {
               this.loading = false;
             }
           },
 
-          async add() {
-            if (!this.form.name || !this.form.expiry) return;
-
+          async saveItem(payload) {
             this.loading = true;
             try {
-              // カンマ区切りで保存
+              console.log(payload);
               await fetch(`${API}?key=${KEY}`, {
-                method: "POST",
+                method: 'POST',
+                // body: JSON.stringify(payload),
                 body: JSON.stringify({
-                  name: this.form.name,
-                  expiry: this.form.expiry,
-                  tags: this.form.tags.split(",").filter(Boolean),
-                  ignore: this.form.ignore,
+                  name: payload.name,
+                  expireDate: payload.expireDate,
+                  // category: payload.category.split(',').filter(Boolean),
+                  category: payload.category,
+                  graceDays: payload.graceDays,
                 }),
+                mode: 'no-cors',
               });
-              this.form = { name: "", expiry: "", tags: "", ignore: false };
-              await this.load();
+              await this.loadData();
             } finally {
               this.loading = false;
             }
@@ -143,15 +161,60 @@
             return new Date(item.expiry) < new Date();
           },
 
-          filtered() {
-            return this.items.filter((i) => !this.hideIgnored || !i.ignore);
-          },
-
           // YYYY/MM/DD形式に変換する
           formatDateOnly(iso) {
-            return new Date(iso).toLocaleDateString("ja-JP", {
-              timeZone: "Asia/Tokyo",
+            return new Date(iso).toLocaleDateString('ja-JP', {
+              timeZone: 'Asia/Tokyo',
             });
+          },
+        };
+      }
+
+      function foodForm() {
+        return {
+          name: '',
+          expireDate: '',
+          category: '',
+          graceDays: 0,
+
+          categories: GRACE_BY_CATEGORY,
+
+          applyGrace() {
+            if (this.category) {
+              this.graceDays = this.categories[this.category];
+            }
+          },
+
+          validate() {
+            if (!this.name.trim()) return '商品名を入力してください';
+            if (!this.expireDate) return '賞味期限を入力してください';
+            return null;
+          },
+
+          async submit() {
+            const err = this.validate();
+            if (err) {
+              alert(err);
+              return;
+            }
+
+            const payload = {
+              name: this.name.trim(),
+              expireDate: this.expireDate,
+              category: this.category,
+              graceDays: this.graceDays,
+            };
+
+            this.$dispatch('submit-data', payload);
+
+            this.reset();
+          },
+
+          reset() {
+            this.name = '';
+            this.expireDate = '';
+            this.category = '';
+            this.graceDays = '';
           },
         };
       }
