@@ -151,12 +151,18 @@
               );
 
               // 日付をYYYY-MM-DD形式にしてから保存
-              this.items = data.map((item) => ({
-                ...item,
-                expireDate: new Date(item.expiry).toISOString().slice(0, 10),
-                // expireDate: this.formatDateOnly(item.expiry),
-                category: item.category,
-              }));
+              this.items = data
+                .map((item) => {
+                  const d = new Date(item.expireDate);
+                  return {
+                    ...item,
+                    expireDate: isNaN(d) ? '' : d.toISOString().slice(0, 10),
+                    category: item.category,
+                  };
+                })
+                .sort(
+                  (a, b) => new Date(a.expireDate) - new Date(b.expireDate),
+                );
             } catch (e) {
               alert('通信に失敗しました。もう一度操作をやり直してください。');
               console.error(e);
@@ -189,7 +195,7 @@
 
           // 賞味期限切れかどうか
           isExpired(item) {
-            return new Date(item.expiry) < new Date();
+            return new Date(item.expireDate) < new Date();
           },
 
           // YYYY/MM/DD形式に変換する
