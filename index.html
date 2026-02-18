@@ -17,7 +17,7 @@
   <body
     x-data="app()"
     x-init="loadData()"
-    @submit-data.window="saveItem($event.detail)"
+    @submit-data.window="addItem($event.detail)"
   >
     <header>賞味期限管理</header>
 
@@ -171,13 +171,14 @@
             }
           },
 
-          async saveItem(payload) {
+          async addItem(payload) {
             this.loading = true;
             try {
               console.log(payload);
               await fetch(`${API}?key=${KEY}`, {
                 method: 'POST',
                 body: JSON.stringify({
+                  action: 'add',
                   name: payload.name,
                   expireDate: payload.expireDate,
                   category: payload.category,
@@ -210,6 +211,39 @@
             console.log(item);
             console.log(item.name);
             this.editTarget = JSON.parse(JSON.stringify(item));
+          },
+
+          // アイテムの削除
+          async deleteItem(item) {
+            if (!confirm(`「${item.name}」を削除しますか？`)) return;
+
+            this.loading = true;
+
+            await fetch(`${API}?key=${KEY}`, {
+              method: 'POST',
+              mode: 'no-cors',
+              body: JSON.stringify({
+                action: 'delete',
+                id: item.id,
+              }),
+            });
+
+            await this.loadData();
+          },
+
+          async saveEdit() {
+            this.loading = true;
+            await fetch(`${API}?key=${KEY}`, {
+              method: 'POST',
+              mode: 'no-cors',
+              body: JSON.stringify({
+                action: 'update',
+                ...this.editTarget,
+              }),
+            });
+
+            this.editTarget = null;
+            await this.loadData();
           },
         };
       }
