@@ -29,6 +29,25 @@
           <p>読み込み中...</p>
         </div>
       </div>
+      <div
+        class="modal"
+        x-show="editTarget"
+        x-transition
+        @click.self="editTarget=null"
+      >
+        <div class="modal-content">
+          <h3>編集</h3>
+
+          <input x-model="editTarget.name" placeholder="商品名" />
+          <input type="date" x-model="editTarget.expireDate" />
+
+          <div class="buttons">
+            <button @click="saveEdit()">保存</button>
+            <button @click="editTarget=null">キャンセル</button>
+          </div>
+        </div>
+      </div>
+
       <!-- 入力フォーム -->
       <div class="card">
         <div x-data="foodForm()">
@@ -66,15 +85,30 @@
       <div class="list">
         <template x-for="item in items" :key="item.id">
           <div class="item" :class="{ expired: isExpired(item) }">
-            <strong x-text="item.name"></strong>
-            <div>
-              期限：<span x-text="item.expireDate"></span>
-              <span class="tag" x-text="item.category"></span>
+            <div class="item-header">
+              <strong x-text="item.name"></strong>
+
+              <div class="actions">
+                <button class="icon-btn" @click="openEdit(item)" title="編集">
+                  ✏️
+                </button>
+                <button
+                  class="icon-btn delete"
+                  @click="deleteItem(item)"
+                  title="削除"
+                >
+                  🗑️
+                </button>
+              </div>
             </div>
 
             <!-- <div x-show="item.ignore" style="color: #ef4444; font-size: 12px">
-              ※期限切れ許容
-            </div> -->
+                ※期限切れ許容
+              </div> -->
+            <div>
+              期限：<span x-text="formatDate(item.expireDate)"></span>
+              <span class="tag" x-text="item.category"></span>
+            </div>
           </div>
         </template>
       </div>
@@ -106,6 +140,9 @@
 
           loading: false,
 
+          // 編集対象のアイテム
+          editTarget: null,
+
           async loadData() {
             this.loading = true;
             try {
@@ -116,7 +153,8 @@
               // 日付をYYYY-MM-DD形式にしてから保存
               this.items = data.map((item) => ({
                 ...item,
-                expireDate: this.formatDateOnly(item.expiry),
+                expireDate: new Date(item.expiry).toISOString().slice(0, 10),
+                // expireDate: this.formatDateOnly(item.expiry),
                 category: item.category,
               }));
             } catch (e) {
@@ -155,10 +193,17 @@
           },
 
           // YYYY/MM/DD形式に変換する
-          formatDateOnly(iso) {
-            return new Date(iso).toLocaleDateString('ja-JP', {
+          formatDate(date) {
+            return new Date(date).toLocaleDateString('ja-JP', {
               timeZone: 'Asia/Tokyo',
             });
+          },
+
+          // 編集画面を開く
+          async openEdit(item) {
+            console.log(item);
+            console.log(item.name);
+            this.editTarget = JSON.parse(JSON.stringify(item));
           },
         };
       }
