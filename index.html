@@ -88,30 +88,32 @@
       <!-- 一覧 -->
       <div class="list">
         <template x-for="item in items" :key="item.id">
-          <div class="item" :class="{ expired: isExpired(item) }">
+          <div
+            class="item"
+            :class="{ expired: isExpired(item) , rebuy: item.rebuy}"
+          >
             <div class="item-header">
-              <strong x-text="item.name"></strong>
+              <label class="rebuy-check">
+                <input
+                  type="checkbox"
+                  :checked="item.rebuy"
+                  @change="toggleRebuy(item)"
+                />
+                <span class="name" x-text="item.name"></span>
+              </label>
 
               <div class="actions">
-                <!-- <button class="icon-btn" @click="openEdit(item)" title="編集">
-                  ✏️
-                </button> -->
-                <button
-                  class="icon-btn delete"
-                  @click="deleteItem(item)"
-                  title="削除"
-                >
+                <button class="icon-btn" @click="openEdit(item)">✏️</button>
+                <button class="icon-btn delete" @click="deleteItem(item)">
                   🗑️
                 </button>
               </div>
             </div>
-
-            <!-- <div x-show="item.ignore" style="color: #ef4444; font-size: 12px">
-                ※期限切れ許容
-              </div> -->
-            <div>
-              期限：<span x-text="item.expireDate"></span>
-              <span class="tag" x-text="item.category"></span>
+            <div class="item-footer">
+              <span>
+                期限：<span x-text="formatDate(item.expireDate)"></span>
+              </span>
+              <span class="category" x-text="item.category"></span>
             </div>
           </div>
         </template>
@@ -224,6 +226,25 @@
             return new Date(date).toLocaleDateString('ja-JP', {
               timeZone: 'Asia/Tokyo',
             });
+          },
+
+          // 再購入のトグル処理
+          async toggleRebuy(item) {
+            item.rebuy = !item.rebuy;
+
+            try {
+              await fetch(`${API}?key=${KEY}`, {
+                method: 'POST',
+                mode: 'no-cors',
+                body: JSON.stringify({
+                  action: 'update',
+                  ...item,
+                }),
+              });
+            } catch (err) {
+              item.rebuy = !item.rebuy;
+              alert('更新に失敗しました');
+            }
           },
 
           // 編集画面を開く
