@@ -87,7 +87,7 @@
 
       <!-- 一覧 -->
       <div class="list">
-        <template x-for="item in items" :key="item.id">
+        <template x-for="item in sortedItems()" :key="item.id">
           <div
             class="item"
             :class="{ expired: isExpired(item) , rebuy: item.rebuy}"
@@ -225,6 +225,14 @@
           formatDate(date) {
             return new Date(date).toLocaleDateString('ja-JP', {
               timeZone: 'Asia/Tokyo',
+            });
+          },
+
+          // 再購入フラグが入っているものを上にソート
+          sortedItems() {
+            return [...this.items].sort((a, b) => {
+              if (a.rebuy !== b.rebuy) return b.rebuy - a.rebuy;
+              return new Date(a.expireDate) - new Date(b.expireDate);
             });
           },
 
