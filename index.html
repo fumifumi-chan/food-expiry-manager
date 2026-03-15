@@ -111,9 +111,17 @@
             </div>
             <div class="item-footer">
               <span>
-                期限：<span x-text="formatDate(item.expireDate)"></span>
+                📅期限：<span x-text="formatDate(item.expireDate)"></span>
               </span>
               <span class="category" x-text="item.category"></span>
+              <br />
+              <span x-show="item.memo">
+                💬メモ：<span
+                  class="memo"
+                  x-text="item.memo"
+                  x-show="item.memo"
+                ></span>
+              </span>
             </div>
           </div>
         </template>
