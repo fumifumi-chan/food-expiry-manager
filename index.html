@@ -18,115 +18,80 @@
     x-data="app()"
     x-init="loadData()"
     @submit-data.window="addItem($event.detail)"
+    @update-data.window="saveEdit($event.detail)"
+    @clear-edit.window="editingId = null"
   >
     <header>賞味期限管理</header>
 
     <main>
-      <!-- 読み込み中表示 -->
-      <div x-show="loading" x-transition.opacity class="loading-overlay">
-        <div class="loading-box">
-          <div class="spinner"></div>
-          <p>読み込み中...</p>
-        </div>
-      </div>
-      <div
-        class="modal"
-        x-show="editTarget"
-        x-transition
-        @click.self="editTarget=null"
-      >
-        <div class="modal-content">
-          <h3>編集</h3>
-
-          <input x-model="editTarget.name" placeholder="商品名" />
-          <input type="date" x-model="editTarget.expireDate" />
-
-          <div class="buttons">
-            <button @click="saveEdit()">保存</button>
-            <button @click="editTarget=null">キャンセル</button>
-          </div>
-        </div>
-      </div>
-
-      <!-- 入力フォーム -->
-      <div class="card">
-        <div x-data="foodForm()">
-          <!-- 商品名 -->
-          <label>商品名</label>
-          <input type="text" placeholder="食品名" x-model="name" required />
-
-          <!-- カテゴリ選択 -->
-          <label>カテゴリ</label>
-          <select x-model="category" @change="applyGrace()">
-            <option value="">選択してください</option>
-            <template x-for="(days, name) in categories" :key="name">
-              <option :value="name" x-text="name"></option>
-            </template>
-          </select>
-
-          <!-- 賞味・消費期限 -->
-          <label>期限</label>
-          <input type="date" x-model="expireDate" required />
-
-          <!-- 猶予日数 -->
-          <label>猶予日数（必要な場合のみ変更）</label>
-          <input type="number" x-model.number="graceDays" />
-
-          <!-- メモ -->
-          <label>メモ</label>
-          <input type="text" placeholder="メモ" x-model.number="memo" />
-
-          <button @click="submit()">追加</button>
-        </div>
-      </div>
-
-      <!-- フィルター -->
-      <!-- <div class="card">
-        <label> このあたりにフィルタボタンを配置 </label>
-      </div> -->
-
-      <!-- 一覧 -->
       <div class="list">
         <template x-for="item in sortedItems()" :key="item.id">
           <div
             class="item"
-            :class="{ expired: isExpired(item) , rebuy: item.rebuy}"
+            :class="{ expired: isExpired(item), 'editing-now': editingId === item.id }"
           >
             <div class="item-header">
-              <label class="rebuy-check">
+              <label class="rebuy-check" style="display: flex; align-items: center; gap: 8px; cursor: pointer;">
                 <input
                   type="checkbox"
                   :checked="item.rebuy"
                   @change="toggleRebuy(item)"
+                  @click.stop /* 親のクリックイベント（もしあれば）を阻害しない */
                 />
                 <span class="name" x-text="item.name"></span>
               </label>
 
               <div class="actions">
-                <button class="icon-btn" @click="openEdit(item)">✏️</button>
-                <button class="icon-btn delete" @click="deleteItem(item)">
-                  🗑️
-                </button>
+                <button class="icon-btn" @click="startEdit(item)">✏️</button>
+                <button class="icon-btn" @click="deleteItem(item)">🗑️</button>
               </div>
             </div>
             <div class="item-footer">
-              <span>
-                📅期限：<span x-text="formatDate(item.expireDate)"></span>
-              </span>
-              <span class="category" x-text="item.category"></span>
-              <br />
-              <span x-show="item.memo">
-                💬メモ：<span
-                  class="memo"
-                  x-text="item.memo"
-                  x-show="item.memo"
-                ></span>
-              </span>
+              📅 <span x-text="DateUtils.forDisplay(item.expireDate)"></span> 📂
+              <span x-text="item.category"></span>
+              <template x-if="item.memo">
+                <span> 💬 <span x-text="item.memo"></span></span>
+              </template>
             </div>
           </div>
         </template>
       </div>
     </main>
+
+    <div class="footer-form" x-data="foodForm()">
+      <template x-if="editingId">
+        <span class="edit-label">現在編集モード...</span>
+      </template>
+
+      <div class="form-grid">
+        <input type="text" placeholder="食品名" x-model="name" />
+        <select x-model="category" @change="applyGrace()">
+          <option value="">カテゴリ</option>
+          <template x-for="(days, catName) in categories" :key="catName">
+            <option :value="catName" x-text="catName"></option>
+          </template>
+        </select>
+        <input type="date" x-model="expireDate" />
+        <input
+          type="text"
+          placeholder="メモを入力..."
+          x-model="memo"
+          style="font-size: 0.8rem"
+        />
+        <div style="display: flex; gap: 4px">
+          <button
+            class="btn-submit"
+            @click="submit()"
+            x-text="editingId ? '更新' : '追加'"
+          ></button>
+          <button
+            class="btn-cancel"
+            @click="cancelEdit()"
+            x-text="editingId ? 'キャンセル' : '入力をリセット'"
+          ></button>
+        </div>
+      </div>
+    </div>
 
     <script>
       const API =
@@ -148,17 +113,29 @@
         その他: 0,
       };
 
+      // 日付関連のユーティリティ
+      const DateUtils = {
+      // 表示用 (YYYY/MM/DD)
+        forDisplay(date) {
+          if (!date) return '';
+          return new Date(date).toLocaleDateString('ja-JP', { timeZone: 'Asia/Tokyo' });
+        },
+        // 入力フォーム用 (YYYY-MM-DD)
+        forInput(date) {
+          if (!date) return '';
+          const d = new Date(date);
+          // ISO 8601形式 (YYYY-MM-DDTHH:mm:ss.sssZ) の先頭10文字を抜く
+          return d.toISOString().split('T')[0];
+        }
+      }
+
       function app() {
         return {
           items: [],
-
-          loading: false,
-
-          // 編集対象のアイテム
-          editTarget: null,
+          // 編集対象のアイテムID
+          editingId: null,
 
           async loadData() {
-            this.loading = true;
             try {
               const data = await fetch(`${API}?key=${KEY}`).then((r) =>
                 r.json(),
@@ -170,7 +147,7 @@
                   const d = new Date(item.expireDate);
                   return {
                     ...item,
-                    expireDate: isNaN(d) ? '' : this.formatDate(d),
+                    expireDate: isNaN(d) ? '' : DateUtils.forDisplay(d),
                     category: item.category,
                   };
                 })
@@ -180,36 +157,58 @@
             } catch (e) {
               alert('通信に失敗しました。もう一度操作をやり直してください。');
               console.error(e);
-            } finally {
-              this.loading = false;
             }
           },
 
+          // 編集を開始する
+          startEdit(item) {
+            this.editingId = item.id;
+            // フォームコンポーネントにデータを飛ばす
+            window.dispatchEvent(new CustomEvent('set-form', { detail: item }));
+          },
+
+          // 編集内容を保存する
+          async saveEdit(edited) {
+            // バックアップ（ディープコピー）
+            const backup = JSON.parse(JSON.stringify(this.items));
+
+            const idx = this.items.findIndex((i) => i.id === edited.id);
+            if (idx !== -1) {
+              this.items[idx] = { ...edited };
+            }
+            this.editingId = null;
+
+            try {
+              await fetch(`${API}?key=${KEY}`, {
+                method: 'POST',
+                mode: 'no-cors',
+                body: JSON.stringify({
+                  action: 'update',
+                  ...edited,
+                }),
+              });
+            } catch (e) {
+              console.error(e);
+
+              // ロールバック処理
+              this.items = backup;
+              alert('更新に失敗しました');
+            }
+          },
+
+          // 新規項目を追加する
           async addItem(payload) {
-            // UUID生成
-            const id = crypto.randomUUID();
-
-            // UIへ反映
-            const item = {
-              id,
-              name: payload.name,
-              expireDate: payload.expireDate,
-              category: payload.category,
-              graceDays: payload.graceDays,
-              rebuy: false,
-              memo: payload.memo,
-            };
-
-            this.items.unshift(item);
+            const newItem = { id: crypto.randomUUID(), ...payload, rebuy: false };
+            this.items.unshift(newItem);
 
             try {
               console.log(payload);
-              console.log(item);
+              console.log(newItem);
               const res = await fetch(`${API}?key=${KEY}`, {
                 method: 'POST',
                 body: JSON.stringify({
                   action: 'add',
-                  ...item,
+                  ...newItem,
                 }),
                 // CORSエラー対策
                 // NOTE: headersを指定しなくても、勝手にヘッダがついて引っかかる模様
@@ -227,13 +226,6 @@
           // 賞味期限切れかどうか
           isExpired(item) {
             return new Date(item.expireDate) < new Date();
-          },
-
-          // YYYY/MM/DD形式に変換する
-          formatDate(date) {
-            return new Date(date).toLocaleDateString('ja-JP', {
-              timeZone: 'Asia/Tokyo',
-            });
           },
 
           // 再購入フラグが入っているものを上にソート
@@ -263,13 +255,6 @@
             }
           },
 
-          // 編集画面を開く
-          async openEdit(item) {
-            console.log(item);
-            console.log(item.name);
-            this.editTarget = JSON.parse(JSON.stringify(item));
-          },
-
           // アイテムの削除
           async deleteItem(item) {
             if (!confirm(`「${item.name}」を削除しますか？`)) return;
@@ -296,45 +281,36 @@
             }
           },
 
-          async saveEdit(edited) {
-            // バックアップ（ディープコピー）
-            const backup = JSON.parse(JSON.stringify(this.items));
 
-            const idx = this.items.findIndex((i) => i.id === edited.id);
-            if (idx !== -1) {
-              this.items[idx] = { ...edited };
-            }
-
-            try {
-              await fetch(`${API}?key=${KEY}`, {
-                method: 'POST',
-                mode: 'no-cors',
-                body: JSON.stringify({
-                  action: 'update',
-                  ...edited,
-                }),
-              });
-            } catch (e) {
-              console.error(e);
-
-              // ロールバック処理
-              this.items = backup;
-              alert('更新に失敗しました');
-            }
-          },
         };
       }
 
       function foodForm() {
         return {
+          // 編集対象のID、nullの場合新規
+          editingId: null,
+
           name: '',
           expireDate: '',
           category: '',
           graceDays: 0,
           rebuy: false,
           memo: '',
-
           categories: GRACE_BY_CATEGORY,
+
+          init() {
+            // 外部(app)からの編集要求を受け取る
+            window.addEventListener('set-form', (e) => {
+              const item = e.detail;
+              console.log(item.expireDate);
+              this.editingId = item.id;
+              this.name = item.name;
+              this.category = item.category;
+              this.expireDate = DateUtils.forInput(item.expireDate);
+              this.memo = item.memo || '';
+              this.rebuy = item.rebuy || false;
+            });
+          },
 
           applyGrace() {
             if (this.category) {
@@ -347,6 +323,7 @@
             if (!this.expireDate) return '賞味期限を入力してください';
             return null;
           },
+
 
           async submit() {
             const err = this.validate();
@@ -363,19 +340,27 @@
               rebuy: this.rebuy,
               memo: this.memo,
             };
+            
+            if(this.editingId) {
+              // 編集対象が存在する場合は更新
+              this.$dispatch('update-data', { id: this.editingId, ...payload });
+            } else {
+              this.$dispatch('submit-data', payload);
+            }
 
-            this.$dispatch('submit-data', payload);
-
-            this.reset();
+            this.cancelEdit();
           },
 
-          reset() {
+          cancelEdit() {
+            this.editingId = null;
             this.name = '';
             this.expireDate = '';
             this.category = '';
             this.graceDays = '';
             this.rebuy = false;
             this.memo = '';
+
+            this.$dispatch('clear-edit');
           },
         };
       }
