@@ -7,8 +7,11 @@
   --bg-color: #f6f7f9;
   --warn: #f59e0b;
   --critical: #f97316;
-  --danger: #ef4444;
+  --expired: #ef4444;
   --success: #22c55e;
+  --hp-warn: #fef3c7;
+  --hp-critical: #ffedd5;
+  --hp-expired: #fee2e2;
   --border: #ddd;
 }
 
@@ -71,27 +74,47 @@ button:hover {
 }
 
 .item {
+  position: relative; /* 疑似要素の基準 */
+  z-index: 0; /* 重なり順の起点 */
   background: white;
   padding: 12px;
   border-radius: 12px;
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
   border-left: 12px solid var(--success);
+  overflow: hidden; /* バーが角丸からはみ出さないように */
   transition:
     transform 0.2s,
     border 0.2s;
 }
 
-/* 状態別のスタイル */
+/* HPバー本体（背景として機能） */
+.item::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  height: 100%;
+  /* JSから渡された --hp-width を使用。未指定なら0% */
+  width: var(--hp-width, 0%);
+  z-index: -1; /* 文字の後ろに配置 */
+  background-color: var(--hp-color, #d1fae5); /* デフォルトは薄緑 */
+  transition:
+    width 0.5s ease-out,
+    background-color 0.5s;
+}
+
+/* 状態別の色定義 */
 .item.warn {
+  --hp-color: var(--hp-warn);
   border-left-color: var(--warn);
-  opacity: 0.8;
 }
 .item.critical {
+  --hp-color: var(--hp-critical);
   border-left-color: var(--critical);
-  opacity: 0.8;
 }
 .item.expired {
-  border-left-color: var(--danger);
+  --hp-color: var(--hp-expired);
+  border-left-color: var(--expired);
   opacity: 0.8;
 }
 .item.rebuy {
@@ -138,7 +161,7 @@ button:hover {
 }
 
 .icon-btn.delete {
-  color: var(--danger);
+  color: var(--expired);
 }
 
 .item-footer {

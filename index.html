@@ -29,6 +29,7 @@
           <div
             class="item"
             :class="{ warn: getDaysUntilExpiry(item) <= 30, critical: getDaysUntilExpiry(item) <= 7, expired: isExpired(item), 'editing-now': editingId === item.id }"
+            :style="{ '--hp-width': getHPWidth(item) }"
           >
             <div class="item-header">
               <label class="rebuy-check" style="display: flex; align-items: center; gap: 8px; cursor: pointer;">
@@ -232,6 +233,14 @@
           // 賞味期限切れかどうか
           isExpired(item) {
             return new Date(item.expireDate) < new Date();
+          },
+
+          getHPWidth(item) {
+            console.log(item);
+            const days = this.getDaysUntilExpiry(item);
+            const maxDays = 30; // 1ヶ月を最大とする
+            const percentage = Math.max(0, Math.min(100, (days / maxDays) * 100));
+            return `${percentage}%`;
           },
 
           // 再購入フラグが入っているものを上にソート
