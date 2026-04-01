@@ -5,6 +5,8 @@
   --primary: #4f46e5;
   --primary-hover: #4338ca;
   --bg-color: #f6f7f9;
+  --warn: #f59e0b;
+  --critical: #f97316;
   --danger: #ef4444;
   --success: #22c55e;
   --border: #ddd;
@@ -73,13 +75,21 @@ button:hover {
   padding: 12px;
   border-radius: 12px;
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
-  border-left: 6px solid var(--success);
+  border-left: 12px solid var(--success);
   transition:
     transform 0.2s,
     border 0.2s;
 }
 
 /* 状態別のスタイル */
+.item.warn {
+  border-left-color: var(--warn);
+  opacity: 0.8;
+}
+.item.critical {
+  border-left-color: var(--critical);
+  opacity: 0.8;
+}
 .item.expired {
   border-left-color: var(--danger);
   opacity: 0.8;
