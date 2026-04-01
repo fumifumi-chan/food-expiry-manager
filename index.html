@@ -235,12 +235,23 @@
             return new Date(item.expireDate) < new Date();
           },
 
+          // HPゲージの割合を取得
           getHPWidth(item) {
-            console.log(item);
             const days = this.getDaysUntilExpiry(item);
-            const maxDays = 30; // 1ヶ月を最大とする
-            const percentage = Math.max(0, Math.min(100, (days / maxDays) * 100));
-            return `${percentage}%`;
+            if (days <= 0) return '0%';
+            if (days > 30) return '100%';
+
+            let percentage;
+            if (days > 7) {
+                // 30日から7日までの間：100%から50%まで緩やかに減らす
+                // (days-7) / (30-7) で 0〜1 の比率を出して、それに50%分を掛けて50を足す
+                percentage = 50 + ((days - 7) / (30 - 7)) * 50;
+            } else {
+                // 7日から0日までの間：50%から0%まで急激に減らす
+                // days / 7 で 0〜1 の比率を出して、それに50%分を掛ける
+                percentage = (days / 7) * 50;
+            }
+            return `${Math.round(percentage)}%`;
           },
 
           // 再購入フラグが入っているものを上にソート
