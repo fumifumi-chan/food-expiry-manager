@@ -125,8 +125,11 @@
         forInput(date) {
           if (!date) return '';
           const d = new Date(date);
-          // ISO 8601形式 (YYYY-MM-DDTHH:mm:ss.sssZ) の先頭10文字を抜く
-          return d.toISOString().split('T')[0];
+          // 日本時間のままYYYY-MM-DD形式にする
+          const yyyy = d.getFullYear();
+          const mm = String(d.getMonth() + 1).padStart(2, '0');
+          const dd = String(d.getDate()).padStart(2, '0');
+          return `${yyyy}-${mm}-${dd}`;
         }
       }
 
