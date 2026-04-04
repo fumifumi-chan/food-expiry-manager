@@ -229,8 +229,14 @@
 
           // 賞味期限切れまでの残り日数を返す
           getDaysUntilExpiry(item) {
-            const diffTime = new Date(item.expireDate) - new Date();
-            return Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+            // 期限、今日どちらも0時に揃えてから計算する
+            const expiry = new Date(item.expireDate);
+            expiry.setHours(0, 0, 0, 0);
+            const today = new Date();
+            today.setHours(0, 0, 0, 0);
+
+            const diffTime = expiry - today;
+            return Math.round(diffTime / (1000 * 60 * 60 * 24));
           },
 
           // 賞味期限切れかどうか
